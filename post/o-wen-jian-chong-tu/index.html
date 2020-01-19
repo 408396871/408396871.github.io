@@ -1,0 +1,174 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+<meta name="description" content="" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>.o文件冲突 | Hve Notes</title>
+<link rel="shortcut icon" href="https://408396871.github.io/favicon.ico">
+<link rel="stylesheet" href="https://408396871.github.io/styles/main.css">
+
+<script src="https://cdn.bootcss.com/highlight.js/9.12.0/highlight.min.js"></script>
+<script src="https://cdn.bootcss.com/moment.js/2.23.0/moment.min.js"></script>
+
+
+  </head>
+  <body>
+    <div class="main">
+      <div class="main-content">
+        <div class="site-header">
+  <a href="https://408396871.github.io">
+  <img class="avatar" src="https://408396871.github.io/images/avatar.png" alt="" width="80px" height="80px">
+  </a>
+  <h1 class="site-title">
+    Hve Notes
+  </h1>
+  <p class="site-description">
+    温故而知新
+  </p>
+  <div class="menu-container">
+    
+      
+        <a href="/" class="menu">
+          首页
+        </a>
+      
+    
+      
+        <a href="/archives" class="menu">
+          归档
+        </a>
+      
+    
+      
+        <a href="/tags" class="menu">
+          标签
+        </a>
+      
+    
+      
+        <a href="/post/about" class="menu">
+          关于
+        </a>
+      
+    
+  </div>
+</div>
+
+      
+        <div class="post-detail">
+          <article class="post">
+            <h2 class="post-title">
+              .o文件冲突
+            </h2>
+            <div class="post-info">
+              <time class="post-time">
+                · 2018-03-01 ·
+              </time>
+              
+            </div>
+            <div class="post-content">
+              <blockquote>
+<p>问题描述：opencv2.framework与BaiduMapAPI_Base.framework中部分.o文件冲突，导致编译不能通过</p>
+</blockquote>
+<h3 id="-">背景</h3>
+<p>某些通用处理库被百度BaiduMapAPI_Base.framework和opencv2.framework 都引用进去 ，这样导致的问题就是当接入百度地图的app再次引入opencv.framework的时候,就会报duplicate symbol … in的错误。</p>
+<h3 id="-">解决思路</h3>
+<ol>
+<li>对比BaiduMapAPI_Base.framework和opencv2.framework中的.o文件</li>
+<li>把两个framework中重复部分从opencv2.framework中“剔除”,然后再将处理后的opencv2.framework加入项目中去进行编译</li>
+</ol>
+<h3 id="-">工具</h3>
+<ol>
+<li>ar -- 查看framework中的相关文件</li>
+<li>lipo -- 删除framework中“多余”的.o文件以及重新合成新的framework包</li>
+</ol>
+<h3 id="-">步骤</h3>
+<ol>
+<li>在opencv2.framework所在的目录下，利用下面两个命令，进入opencv2.framework，查看它支持的CPU架构</li>
+</ol>
+<pre><code>cd opencv2.framework
+lipo -info opencv2</code></pre><p>执行完之后输出如下:</p>
+<pre><code>Architectures in the fat file: opencv2 are: armv7 armv7s i386 x86_64 arm64</code></pre><p>从CPU的架构可以看出该framework同时支持真机和模拟器</p>
+<p>2.  把每种架构对应的文件提取出来进行分析处理，首先以armv7架构为例，运行下面命令解压armv7架构下对应的文件</p>
+<pre><code>lipo opencv -thin armv7 -output cv.armv7</code></pre><p>运行成功之后在当前路径下生成一个cv.armv7文件，现在用ar命令来查看该文件中的.o文件</p>
+<pre><code>ar -t cv.armv7</code></pre><pre><code>world_init.o
+algorithm.o
+alloc.o
+arithm.o
+array.o
+cmdparser.o
+convert.o
+copy.o
+datastructs.o
+drawing.o
+dxt.o
+gl_core_3_1.o
+glob.o
+gpumat.o
+lapack.o
+mathfuncs.o
+matmul.o
+matop.o
+matrix.o
+opengl_interop.o
+opengl_interop_deprecated.o
+out.o
+parallel.o
+persistence.o
+rand.o
+stat.o
+system.o
+tables.o
+flann.o
+miniflann.o
+accum.o
+approx.o
+canny.o
+clahe.o
+color.o
+contours.o
+convhull.o
+corner.o
+cornersubpix.o
+deriv.o
+.......</code></pre><p>同样方法分析BaiduMapAPI_Base.framework， 发现重复的文件如下</p>
+<pre><code>adler32.o
+compress.o
+crc32.o
+deflate.o
+inflate.o</code></pre><p>执行删除操作，依次删除这五个文件</p>
+<pre><code>ar d cv.armv7 adler32.o
+...</code></pre><p>至此，armv7架构下的文件“清理”完毕！</p>
+<p>3.  重复步骤2，将其他CPU架构文件夹下的内容做相同操作。此步骤结束之后，会有cv.armv7、cv.armv7s、cv.arm64、cv.i386和cv.x86_64五个删除重复.o后的文件。</p>
+<p>4. 运行下面命令合成新的opencv2包</p>
+<pre><code>lipo -create -output opencv2 cv.armv7  cv.armv7s cv.arm64 cv.i386 cv.x86_64</code></pre><p>命令运行成功之后大功告成，此时将新的opencv2.framework引入工程中，在模拟器和真机上分别进行测试，均可通过编译。</p>
+
+            </div>
+          </article>
+        </div>
+    
+        
+          <div class="next-post">
+            <div class="next">下一篇</div>
+            <a href="https://408396871.github.io/post/a curtain advertisement mode">
+              <h3 class="post-title">
+                一个窗帘广告的效果
+              </h3>
+            </a>
+          </div>  
+        
+
+        
+    
+        <div class="site-footer">
+  Powered by Hve Notes
+</div>
+
+<script>
+  hljs.initHighlightingOnLoad()
+</script>
+
+      </div>
+    </div>
+  </body>
+</html>
